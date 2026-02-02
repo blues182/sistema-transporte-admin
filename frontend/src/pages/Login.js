@@ -103,16 +103,6 @@ function Login({ onLoginSuccess }) {
             {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
           </button>
         </form>
-
-        <div className="mt-6 text-center text-sm text-gray-600">
-          <p>Usuarios de prueba:</p>
-          <p className="mt-2">
-            <strong>Admin:</strong> usuario: admin, contraseña: admin123
-          </p>
-          <p>
-            <strong>Normal:</strong> usuario: usuario, contraseña: user123
-          </p>
-        </div>
       </div>
     </div>
   );
