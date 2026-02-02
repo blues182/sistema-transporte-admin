@@ -18,12 +18,17 @@ router.get('/viaje/:viajeId', async (req, res) => {
 // Crear nuevo gasto
 router.post('/', async (req, res) => {
   try {
-    const { viaje_id, tipo_gasto, descripcion, monto, fecha, comprobante } = req.body;
+    const { 
+      viaje_id, tipo_gasto, descripcion, monto, fecha, comprobante,
+      litros_diesel, precio_litro, numero_caseta, nombre_caseta
+    } = req.body;
     
     const [result] = await db.query(
-      `INSERT INTO gastos_viaje (viaje_id, tipo_gasto, descripcion, monto, fecha, comprobante)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [viaje_id, tipo_gasto, descripcion, monto, fecha, comprobante]
+      `INSERT INTO gastos_viaje 
+       (viaje_id, tipo_gasto, descripcion, monto, fecha, comprobante, litros_diesel, precio_litro, numero_caseta, nombre_caseta)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [viaje_id, tipo_gasto, descripcion, monto, fecha, comprobante, 
+       litros_diesel || null, precio_litro || null, numero_caseta || null, nombre_caseta || null]
     );
 
     res.status(201).json({ id: result.insertId, message: 'Gasto registrado exitosamente' });

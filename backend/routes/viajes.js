@@ -10,7 +10,13 @@ router.get('/', async (req, res) => {
       SELECT v.*, 
              t.numero_economico, t.placas,
              CONCAT(c.nombre, ' ', c.apellidos) as conductor_nombre,
-             cl.nombre as cliente_nombre
+             cl.nombre as cliente_nombre,
+             COALESCE((
+               SELECT SUM(gv.monto) 
+               FROM gastos_viaje gv 
+               WHERE gv.viaje_id = v.id 
+               AND (LOWER(gv.concepto) LIKE '%sueldo%' OR LOWER(gv.concepto) LIKE '%operador%')
+             ), 0) as sueldo_operador
       FROM viajes v
       JOIN trailers t ON v.trailer_id = t.id
       JOIN conductores c ON v.conductor_id = c.id
@@ -37,6 +43,7 @@ router.get('/', async (req, res) => {
     const [viajes] = await db.query(query, params);
     res.json(viajes);
   } catch (error) {
+    console.error('Error al obtener viajes:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -74,23 +81,54 @@ router.get('/:id', async (req, res) => {
 
 // Crear nuevo viaje
 router.post('/', async (req, res) => {
+  const connection = await db.getConnection();
   try {
+    await connection.beginTransaction();
+
     const {
-      folio, fecha_salida, origen, destino, trailer_id, conductor_id,
-      cliente_id, carga_descripcion, peso_carga, monto_cobrado, km_inicial
+      folio, numero_orden, fecha_salida, origen, destino, trailer_id, numero_remolque, conductor_id,
+      cliente_id, carga_descripcion, tipo_carga, peso_carga, monto_cobrado, km_inicial, gastos
     } = req.body;
 
-    const [result] = await db.query(
-      `INSERT INTO viajes (folio, fecha_salida, origen, destino, trailer_id, 
-       conductor_id, cliente_id, carga_descripcion, peso_carga, monto_cobrado, km_inicial)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [folio, fecha_salida, origen, destino, trailer_id, conductor_id,
-       cliente_id, carga_descripcion, peso_carga, monto_cobrado, km_inicial]
+    // Insertar el viaje
+    const [result] = await connection.query(
+      `INSERT INTO viajes (folio, numero_orden, fecha_salida, origen, destino, trailer_id, numero_remolque,
+       conductor_id, cliente_id, carga_descripcion, tipo_carga, peso_carga, monto_cobrado, km_inicial)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [folio, numero_orden || null, fecha_salida, origen, destino, trailer_id, numero_remolque || null, conductor_id,
+       cliente_id, carga_descripcion || null, tipo_carga || 'general', peso_carga || null, monto_cobrado, km_inicial || null]
     );
 
-    res.status(201).json({ id: result.insertId, message: 'Viaje creado exitosamente' });
+    const viajeId = result.insertId;
+
+    // Insertar gastos si se proporcionaron
+    if (gastos && Array.isArray(gastos) && gastos.length > 0) {
+      for (const gasto of gastos) {
+        await connection.query(
+          `INSERT INTO gastos_viaje (viaje_id, concepto, monto, tipo_gasto, litros_diesel, precio_litro, numero_caseta, nombre_caseta)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            viajeId,
+            gasto.concepto,
+            gasto.monto,
+            gasto.tipo_gasto,
+            gasto.litros_diesel || null,
+            gasto.precio_litro || null,
+            gasto.numero_caseta || null,
+            gasto.nombre_caseta || null
+          ]
+        );
+      }
+    }
+
+    await connection.commit();
+    res.status(201).json({ id: viajeId, message: 'Viaje creado exitosamente', gastos_agregados: gastos?.length || 0 });
   } catch (error) {
+    await connection.rollback();
+    console.error('Error al crear viaje:', error);
     res.status(500).json({ error: error.message });
+  } finally {
+    connection.release();
   }
 });
 

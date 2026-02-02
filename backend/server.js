@@ -13,6 +13,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // Importar rutas
 const viajesRoutes = require('./routes/viajes');
 const trailersRoutes = require('./routes/trailers');
+const remolquesRoutes = require('./routes/remolques');
 const conductoresRoutes = require('./routes/conductores');
 const clientesRoutes = require('./routes/clientes');
 const refaccionesRoutes = require('./routes/refacciones');
@@ -23,6 +24,7 @@ const reportesRoutes = require('./routes/reportes');
 // Usar rutas
 app.use('/api/viajes', viajesRoutes);
 app.use('/api/trailers', trailersRoutes);
+app.use('/api/remolques', remolquesRoutes);
 app.use('/api/conductores', conductoresRoutes);
 app.use('/api/clientes', clientesRoutes);
 app.use('/api/refacciones', refaccionesRoutes);

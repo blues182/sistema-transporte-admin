@@ -18,14 +18,27 @@ CREATE TABLE trailers (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
+-- Tabla de Remolques
+CREATE TABLE remolques (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    numero_remolque VARCHAR(50) UNIQUE NOT NULL,
+    tipo ENUM('caja_seca', 'plataforma', 'tolva', 'tanque', 'refrigerado') DEFAULT 'caja_seca',
+    capacidad_toneladas DECIMAL(10, 2) NOT NULL,
+    estado ENUM('disponible', 'en_uso', 'mantenimiento', 'fuera_servicio') DEFAULT 'disponible',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
 -- Tabla de Conductores
 CREATE TABLE conductores (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
     apellidos VARCHAR(100) NOT NULL,
+    fecha_nacimiento DATE,
     telefono VARCHAR(20),
     licencia VARCHAR(50) UNIQUE,
     vencimiento_licencia DATE,
+    licencia_federal ENUM('si', 'no') DEFAULT 'no',
     estado ENUM('activo', 'inactivo') DEFAULT 'activo',
     notas TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -36,6 +49,7 @@ CREATE TABLE conductores (
 CREATE TABLE clientes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(200) NOT NULL,
+    requiere_factura ENUM('si', 'no') DEFAULT 'no',
     rfc VARCHAR(13),
     direccion TEXT,
     telefono VARCHAR(20),
@@ -52,14 +66,17 @@ CREATE TABLE clientes (
 CREATE TABLE viajes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     folio VARCHAR(50) UNIQUE NOT NULL,
+    numero_orden VARCHAR(100),
     fecha_salida DATETIME NOT NULL,
     fecha_llegada DATETIME,
     origen VARCHAR(200) NOT NULL,
     destino VARCHAR(200) NOT NULL,
     trailer_id INT NOT NULL,
+    numero_remolque VARCHAR(50),
     conductor_id INT NOT NULL,
     cliente_id INT NOT NULL,
     carga_descripcion TEXT,
+    tipo_carga ENUM('general', 'cemento', 'otro') DEFAULT 'general',
     peso_carga DECIMAL(10, 2),
     monto_cobrado DECIMAL(10, 2) NOT NULL,
     estado ENUM('programado', 'en_ruta', 'completado', 'cancelado') DEFAULT 'programado',
@@ -77,10 +94,15 @@ CREATE TABLE viajes (
 CREATE TABLE gastos_viaje (
     id INT AUTO_INCREMENT PRIMARY KEY,
     viaje_id INT NOT NULL,
-    tipo_gasto ENUM('diesel', 'casetas', 'viaticos', 'reparacion', 'estacionamiento', 'otro') NOT NULL,
+    concepto VARCHAR(200),
+    tipo_gasto ENUM('diesel', 'casetas', 'combustible', 'peaje', 'operacion', 'viaticos', 'reparacion', 'estacionamiento', 'otro') NOT NULL,
+    litros_diesel DECIMAL(10, 2) NULL,
+    precio_litro DECIMAL(10, 2) NULL,
+    numero_caseta VARCHAR(100) NULL,
+    nombre_caseta VARCHAR(200) NULL,
     descripcion VARCHAR(200),
     monto DECIMAL(10, 2) NOT NULL,
-    fecha DATE NOT NULL,
+    fecha DATE NULL DEFAULT (CURRENT_DATE),
     comprobante VARCHAR(200),
     notas TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

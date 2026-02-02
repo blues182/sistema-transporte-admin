@@ -28,16 +28,30 @@ router.get('/:id', async (req, res) => {
 // Crear nuevo cliente
 router.post('/', async (req, res) => {
   try {
-    const { nombre, rfc, direccion, telefono, email, contacto, credito_dias } = req.body;
+    const { nombre, telefono, requiere_factura, rfc, direccion, email, estado } = req.body;
+    
+    // Validación
+    if (!nombre) {
+      return res.status(400).json({ error: 'El nombre es requerido' });
+    }
     
     const [result] = await db.query(
-      `INSERT INTO clientes (nombre, rfc, direccion, telefono, email, contacto, credito_dias)
+      `INSERT INTO clientes (nombre, telefono, requiere_factura, rfc, direccion, email, estado)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [nombre, rfc, direccion, telefono, email, contacto, credito_dias]
+      [
+        nombre, 
+        telefono || null, 
+        requiere_factura || 'no', 
+        rfc || null, 
+        direccion || null, 
+        email || null, 
+        estado || 'activo'
+      ]
     );
 
     res.status(201).json({ id: result.insertId, message: 'Cliente creado exitosamente' });
   } catch (error) {
+    console.error('Error al crear cliente:', error);
     res.status(500).json({ error: error.message });
   }
 });

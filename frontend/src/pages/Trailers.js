@@ -5,6 +5,7 @@ function Trailers() {
   const [trailers, setTrailers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [editando, setEditando] = useState(null);
   const [formData, setFormData] = useState({
     numero_economico: '',
     placas: '',
@@ -33,14 +34,20 @@ function Trailers() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/trailers', formData);
-      alert('Trailer creado exitosamente');
+      if (editando) {
+        await api.put(`/trailers/${editando}`, formData);
+        alert('Trailer actualizado exitosamente');
+      } else {
+        await api.post('/trailers', formData);
+        alert('Trailer creado exitosamente');
+      }
       setShowModal(false);
+      setEditando(null);
       cargarTrailers();
       resetForm();
     } catch (error) {
-      console.error('Error al crear trailer:', error);
-      alert('Error al crear el trailer');
+      console.error('Error al guardar trailer:', error);
+      alert('Error al guardar el trailer');
     }
   };
 
@@ -54,6 +61,21 @@ function Trailers() {
       kilometraje: '',
       estado: 'activo'
     });
+    setEditando(null);
+  };
+
+  const editarTrailer = (trailer) => {
+    setFormData({
+      numero_economico: trailer.numero_economico,
+      placas: trailer.placas,
+      marca: trailer.marca,
+      modelo: trailer.modelo,
+      anio: trailer.anio,
+      kilometraje: trailer.kilometraje,
+      estado: trailer.estado
+    });
+    setEditando(trailer.id);
+    setShowModal(true);
   };
 
   const getEstadoBadge = (estado) => {
@@ -109,6 +131,14 @@ function Trailers() {
                 <span className="font-medium">{trailer.kilometraje?.toLocaleString()} km</span>
               </div>
             </div>
+            <div className="mt-4">
+              <button
+                onClick={() => editarTrailer(trailer)}
+                className="w-full btn btn-secondary text-sm"
+              >
+                ✎ Editar Trailer
+              </button>
+            </div>
           </div>
         ))}
       </div>
@@ -117,7 +147,9 @@ function Trailers() {
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-2xl w-full p-6">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">Nuevo Trailer</h2>
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">
+              {editando ? 'Editar Trailer' : 'Nuevo Trailer'}
+            </h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -187,7 +219,7 @@ function Trailers() {
                   Cancelar
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  Guardar
+                  {editando ? 'Actualizar Trailer' : 'Crear Trailer'}
                 </button>
               </div>
             </form>

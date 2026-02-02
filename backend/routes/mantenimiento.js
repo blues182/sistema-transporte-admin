@@ -49,12 +49,16 @@ router.get('/:id', async (req, res) => {
 
 // Crear nuevo mantenimiento
 router.post('/', async (req, res) => {
+  const connection = await db.getConnection();
   try {
     const { trailer_id, fecha, tipo, descripcion, kilometraje, costo_mano_obra, taller, refacciones } = req.body;
 
-    await db.query('START TRANSACTION');
+    await connection.beginTransaction();
 
-    const [result] = await db.query(
+    // Cambiar el estado del trailer a mantenimiento
+    await connection.query('UPDATE trailers SET estado = ? WHERE id = ?', ['mantenimiento', trailer_id]);
+
+    const [result] = await connection.query(
       `INSERT INTO mantenimiento (trailer_id, fecha, tipo, descripcion, kilometraje, costo_mano_obra, taller)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [trailer_id, fecha, tipo, descripcion, kilometraje, costo_mano_obra, taller]
@@ -65,20 +69,20 @@ router.post('/', async (req, res) => {
     // Insertar refacciones usadas y actualizar inventario
     if (refacciones && refacciones.length > 0) {
       for (const ref of refacciones) {
-        await db.query(
+        await connection.query(
           `INSERT INTO mantenimiento_refacciones (mantenimiento_id, refaccion_id, cantidad, precio_unitario)
            VALUES (?, ?, ?, ?)`,
           [mantenimientoId, ref.refaccion_id, ref.cantidad, ref.precio_unitario]
         );
 
         // Actualizar stock
-        await db.query(
+        await connection.query(
           'UPDATE refacciones SET stock_actual = stock_actual - ? WHERE id = ?',
           [ref.cantidad, ref.refaccion_id]
         );
 
         // Registrar movimiento
-        await db.query(
+        await connection.query(
           `INSERT INTO movimientos_inventario (refaccion_id, tipo, cantidad, fecha, motivo, referencia)
            VALUES (?, 'salida', ?, ?, ?, ?)`,
           [ref.refaccion_id, ref.cantidad, fecha, 'Mantenimiento', `MANT-${mantenimientoId}`]
@@ -86,27 +90,48 @@ router.post('/', async (req, res) => {
       }
     }
 
-    await db.query('COMMIT');
+    await connection.commit();
     res.status(201).json({ id: mantenimientoId, message: 'Mantenimiento registrado exitosamente' });
   } catch (error) {
-    await db.query('ROLLBACK');
+    await connection.rollback();
+    console.error('Error al crear mantenimiento:', error);
     res.status(500).json({ error: error.message });
+  } finally {
+    connection.release();
   }
 });
 
 // Actualizar mantenimiento
 router.put('/:id', async (req, res) => {
+  const connection = await db.getConnection();
   try {
+    await connection.beginTransaction();
+    
     const { id } = req.params;
     const updates = req.body;
+    
+    // Si se está completando el mantenimiento, cambiar el estado del trailer a activo
+    if (updates.estado === 'completado') {
+      // Obtener el trailer_id del mantenimiento
+      const [mant] = await connection.query('SELECT trailer_id FROM mantenimiento WHERE id = ?', [id]);
+      if (mant.length > 0) {
+        await connection.query('UPDATE trailers SET estado = ? WHERE id = ?', ['activo', mant[0].trailer_id]);
+      }
+    }
     
     const fields = Object.keys(updates).map(key => `${key} = ?`).join(', ');
     const values = [...Object.values(updates), id];
 
-    await db.query(`UPDATE mantenimiento SET ${fields} WHERE id = ?`, values);
+    await connection.query(`UPDATE mantenimiento SET ${fields} WHERE id = ?`, values);
+    
+    await connection.commit();
     res.json({ message: 'Mantenimiento actualizado exitosamente' });
   } catch (error) {
+    await connection.rollback();
+    console.error('Error al actualizar mantenimiento:', error);
     res.status(500).json({ error: error.message });
+  } finally {
+    connection.release();
   }
 });
 

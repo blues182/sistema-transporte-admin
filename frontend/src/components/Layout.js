@@ -9,9 +9,10 @@ function Layout({ children }) {
     { path: '/', name: 'Dashboard', icon: '📊' },
     { path: '/viajes', name: 'Viajes', icon: '🚛' },
     { path: '/trailers', name: 'Trailers', icon: '🚚' },
+    { path: '/remolques', name: 'Remolques', icon: '📦' },
     { path: '/conductores', name: 'Conductores', icon: '👤' },
     { path: '/clientes', name: 'Clientes', icon: '🏢' },
-    { path: '/refacciones', name: 'Inventario', icon: '📦' },
+    { path: '/refacciones', name: 'Inventario', icon: '🔩' },
     { path: '/mantenimiento', name: 'Mantenimiento', icon: '🔧' },
     { path: '/reportes', name: 'Reportes', icon: '📈' },
   ];

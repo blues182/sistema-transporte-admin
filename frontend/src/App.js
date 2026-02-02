@@ -6,6 +6,7 @@ import Viajes from './pages/Viajes';
 import ViajeDetalle from './pages/ViajeDetalle';
 import NuevoViaje from './pages/NuevoViaje';
 import Trailers from './pages/Trailers';
+import Remolques from './pages/Remolques';
 import Conductores from './pages/Conductores';
 import Clientes from './pages/Clientes';
 import Refacciones from './pages/Refacciones';
@@ -22,6 +23,7 @@ function App() {
           <Route path="/viajes/:id" element={<ViajeDetalle />} />
           <Route path="/viajes/nuevo" element={<NuevoViaje />} />
           <Route path="/trailers" element={<Trailers />} />
+          <Route path="/remolques" element={<Remolques />} />
           <Route path="/conductores" element={<Conductores />} />
           <Route path="/clientes" element={<Clientes />} />
           <Route path="/refacciones" element={<Refacciones />} />
