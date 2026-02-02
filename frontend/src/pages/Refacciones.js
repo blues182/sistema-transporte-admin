@@ -5,6 +5,16 @@ function Refacciones() {
   const [refacciones, setRefacciones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showBajoStock, setShowBajoStock] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [formData, setFormData] = useState({
+    codigo: '',
+    nombre: '',
+    categoria: '',
+    stock_actual: 0,
+    stock_minimo: 0,
+    precio_unitario: 0,
+    ubicacion: ''
+  });
 
   useEffect(() => {
     cargarRefacciones();
@@ -20,6 +30,37 @@ function Refacciones() {
       console.error('Error al cargar refacciones:', error);
       setLoading(false);
     }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/refacciones', formData);
+      alert('Refacción registrada exitosamente');
+      setShowModal(false);
+      cargarRefacciones();
+      resetForm();
+    } catch (error) {
+      console.error('Error al registrar refacción:', error);
+      alert('Error: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      codigo: '',
+      nombre: '',
+      categoria: '',
+      stock_actual: 0,
+      stock_minimo: 0,
+      precio_unitario: 0,
+      ubicacion: ''
+    });
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const formatCurrency = (value) => {
@@ -50,7 +91,7 @@ function Refacciones() {
           >
             {showBajoStock ? '⚠️ Stock Bajo' : 'Ver Todo'}
           </button>
-          <button className="btn btn-primary">
+          <button onClick={() => setShowModal(true)} className="btn btn-primary">
             + Nueva Refacción
           </button>
         </div>
@@ -125,6 +166,129 @@ function Refacciones() {
           </p>
         </div>
       </div>
+
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">
+              Nueva Refacción
+            </h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="label">Código *</label>
+                <input
+                  type="text"
+                  name="codigo"
+                  value={formData.codigo}
+                  onChange={handleChange}
+                  className="input"
+                  placeholder="REF-001"
+                  required
+                />
+              </div>
+              <div>
+                <label className="label">Nombre *</label>
+                <input
+                  type="text"
+                  name="nombre"
+                  value={formData.nombre}
+                  onChange={handleChange}
+                  className="input"
+                  placeholder="Filtro de aceite"
+                  required
+                />
+              </div>
+              <div>
+                <label className="label">Categoría *</label>
+                <select
+                  name="categoria"
+                  value={formData.categoria}
+                  onChange={handleChange}
+                  className="input"
+                  required
+                >
+                  <option value="">Seleccionar...</option>
+                  <option value="Motor">Motor</option>
+                  <option value="Transmisión">Transmisión</option>
+                  <option value="Frenos">Frenos</option>
+                  <option value="Suspensión">Suspensión</option>
+                  <option value="Eléctrico">Eléctrico</option>
+                  <option value="Neumáticos">Neumáticos</option>
+                  <option value="Carrocería">Carrocería</option>
+                  <option value="Otro">Otro</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Stock Actual *</label>
+                  <input
+                    type="number"
+                    name="stock_actual"
+                    value={formData.stock_actual}
+                    onChange={handleChange}
+                    className="input"
+                    min="0"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="label">Stock Mínimo *</label>
+                  <input
+                    type="number"
+                    name="stock_minimo"
+                    value={formData.stock_minimo}
+                    onChange={handleChange}
+                    className="input"
+                    min="0"
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="label">Precio Unitario *</label>
+                <input
+                  type="number"
+                  name="precio_unitario"
+                  value={formData.precio_unitario}
+                  onChange={handleChange}
+                  className="input"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  required
+                />
+              </div>
+              <div>
+                <label className="label">Ubicación</label>
+                <input
+                  type="text"
+                  name="ubicacion"
+                  value={formData.ubicacion}
+                  onChange={handleChange}
+                  className="input"
+                  placeholder="Estante A-1"
+                />
+              </div>
+              <div className="flex justify-end space-x-4 mt-6">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowModal(false);
+                    resetForm();
+                  }}
+                  className="btn btn-secondary"
+                >
+                  Cancelar
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Guardar Refacción
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

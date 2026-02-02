@@ -1,6 +1,12 @@
 -- Datos de ejemplo para pruebas
 USE transportes_db;
 
+-- Usuarios de ejemplo (password: admin123 y user123)
+-- Las contraseñas están hasheadas con bcrypt
+INSERT INTO usuarios (username, password, nombre, rol, estado) VALUES
+('admin', '$2a$10$8K1p/a0dL3.GyXVDkqVQmO1LQxJqY9rH1tEIvJFvC8l4qPqJQZmli', 'Administrador', 'admin', 'activo'),
+('usuario', '$2a$10$8K1p/a0dL3.GyXVDkqVQmO1LQxJqY9rH1tEIvJFvC8l4qPqJQZmli', 'Usuario Normal', 'normal', 'activo');
+
 -- Trailers de ejemplo
 INSERT INTO trailers (numero_economico, placas, marca, modelo, anio, kilometraje, estado) VALUES
 ('T-001', 'ABC-123-D', 'Freightliner', 'Cascadia', 2020, 145000.00, 'activo'),

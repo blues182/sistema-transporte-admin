@@ -181,9 +181,22 @@ CREATE TABLE pagos_conductores (
     FOREIGN KEY (viaje_id) REFERENCES viajes(id)
 );
 
+-- Tabla de Usuarios
+CREATE TABLE usuarios (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    nombre VARCHAR(100) NOT NULL,
+    rol ENUM('admin', 'normal') DEFAULT 'normal',
+    estado ENUM('activo', 'inactivo') DEFAULT 'activo',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
 -- Índices para mejorar rendimiento
 CREATE INDEX idx_viajes_fecha ON viajes(fecha_salida);
 CREATE INDEX idx_viajes_estado ON viajes(estado);
 CREATE INDEX idx_gastos_viaje ON gastos_viaje(viaje_id);
 CREATE INDEX idx_mantenimiento_trailer ON mantenimiento(trailer_id);
 CREATE INDEX idx_refacciones_stock ON refacciones(stock_actual);
+CREATE INDEX idx_usuarios_username ON usuarios(username);
