@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  # Base de datos MariaDB
+  database:
+    image: mariadb:10.11
+    container_name: transportes-db
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_password}
+      MARIADB_DATABASE: ${DB_NAME:-transportes_db}
+      MARIADB_USER: ${DB_USER:-transportes_user}
+      MARIADB_PASSWORD: ${DB_PASSWORD:-transportes_pass}
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
+      - ./database/add_usuarios.sql:/docker-entrypoint-initdb.d/03-usuarios.sql
+    networks:
+      - transportes-network
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: transportes-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      DB_HOST: database
+      DB_USER: ${DB_USER:-transportes_user}
+      DB_PASSWORD: ${DB_PASSWORD:-transportes_pass}
+      DB_NAME: ${DB_NAME:-transportes_db}
+      DB_PORT: 3306
+      JWT_SECRET: ${JWT_SECRET:-tu_secreto_super_seguro_cambiar_en_produccion}
+    ports:
+      - "5000:5000"
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - transportes-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend React
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: transportes-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - transportes-network
+    environment:
+      - REACT_APP_API_URL=http://localhost:5000/api
+
+networks:
+  transportes-network:
+    driver: bridge
+
+volumes:
+  db_data:
+    driver: local
