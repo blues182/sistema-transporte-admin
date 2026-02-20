@@ -4,6 +4,9 @@ import api from '../services/api';
 function Remolques() {
   const [remolques, setRemolques] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [subiendoPolizaId, setSubiendoPolizaId] = useState(null);
+  const [descargandoPolizaId, setDescargandoPolizaId] = useState(null);
+  const [eliminandoPolizaId, setEliminandoPolizaId] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [editando, setEditando] = useState(null);
   const [formData, setFormData] = useState({
@@ -101,6 +104,85 @@ function Remolques() {
     return tipos[tipo] || tipo;
   };
 
+  const subirPoliza = async (remolqueId, archivo) => {
+    if (!archivo) return;
+
+    if (archivo.type !== 'application/pdf' && !archivo.name.toLowerCase().endsWith('.pdf')) {
+      alert('Solo se permiten archivos PDF');
+      return;
+    }
+
+    try {
+      setSubiendoPolizaId(remolqueId);
+      const formDataArchivo = new FormData();
+      formDataArchivo.append('poliza', archivo);
+
+      await api.post(`/remolques/${remolqueId}/poliza`, formDataArchivo, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      alert('Póliza subida exitosamente');
+      await cargarRemolques();
+    } catch (error) {
+      console.error('Error al subir póliza de remolque:', error);
+      alert(error.response?.data?.error || 'Error al subir la póliza');
+    } finally {
+      setSubiendoPolizaId(null);
+    }
+  };
+
+  const descargarPoliza = async (remolque) => {
+    try {
+      setDescargandoPolizaId(remolque.id);
+      const response = await api.get(`/remolques/${remolque.id}/poliza`, {
+        responseType: 'blob',
+      });
+
+      const contentDisposition = response.headers['content-disposition'];
+      let nombreArchivo = remolque.poliza_nombre || `poliza-${remolque.numero_remolque}.pdf`;
+      if (contentDisposition) {
+        const nombreMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+        if (nombreMatch?.[1]) {
+          nombreArchivo = decodeURIComponent(nombreMatch[1]);
+        }
+      }
+
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.setAttribute('download', nombreArchivo);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Error al descargar póliza de remolque:', error);
+      alert(error.response?.data?.error || 'Error al descargar la póliza');
+    } finally {
+      setDescargandoPolizaId(null);
+    }
+  };
+
+  const eliminarPoliza = async (remolque) => {
+    if (!window.confirm(`¿Eliminar póliza de ${remolque.numero_remolque}?`)) {
+      return;
+    }
+
+    try {
+      setEliminandoPolizaId(remolque.id);
+      await api.delete(`/remolques/${remolque.id}/poliza`);
+      alert('Póliza eliminada exitosamente');
+      await cargarRemolques();
+    } catch (error) {
+      console.error('Error al eliminar póliza de remolque:', error);
+      alert(error.response?.data?.error || 'Error al eliminar la póliza');
+    } finally {
+      setEliminandoPolizaId(null);
+    }
+  };
+
   if (loading) {
     return <div className="text-center py-8">Cargando...</div>;
   }
@@ -152,6 +234,7 @@ function Remolques() {
                 <th>Tipo</th>
                 <th>Capacidad (Ton)</th>
                 <th>Estado</th>
+                <th>Póliza PDF</th>
                 <th>Acciones</th>
               </tr>
             </thead>
@@ -165,6 +248,45 @@ function Remolques() {
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${getEstadoBadge(remolque.estado)}`}>
                       {remolque.estado.replace('_', ' ').toUpperCase()}
                     </span>
+                  </td>
+                  <td>
+                    <div className="space-y-2">
+                      <input
+                        type="file"
+                        accept="application/pdf,.pdf"
+                        onChange={(e) => {
+                          const archivo = e.target.files?.[0];
+                          if (archivo) {
+                            subirPoliza(remolque.id, archivo);
+                          }
+                          e.target.value = '';
+                        }}
+                        className="input text-xs"
+                        disabled={subiendoPolizaId === remolque.id}
+                      />
+                      {remolque.tiene_poliza ? (
+                        <div className="flex flex-col gap-1">
+                          <button
+                            type="button"
+                            onClick={() => descargarPoliza(remolque)}
+                            className="text-green-700 hover:text-green-900 font-medium text-xs text-left"
+                            disabled={descargandoPolizaId === remolque.id}
+                          >
+                            {descargandoPolizaId === remolque.id ? 'Descargando...' : '⬇ Descargar PDF'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => eliminarPoliza(remolque)}
+                            className="text-red-600 hover:text-red-800 font-medium text-xs text-left"
+                            disabled={eliminandoPolizaId === remolque.id}
+                          >
+                            {eliminandoPolizaId === remolque.id ? 'Eliminando...' : '🗑 Eliminar PDF'}
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 text-xs">Sin póliza</span>
+                      )}
+                    </div>
                   </td>
                   <td>
                     <button

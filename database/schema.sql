@@ -14,6 +14,10 @@ CREATE TABLE trailers (
     estado ENUM('activo', 'mantenimiento', 'inactivo') DEFAULT 'activo',
     fecha_ultimo_servicio DATE,
     notas TEXT,
+    poliza_nombre VARCHAR(255),
+    poliza_mime VARCHAR(100),
+    poliza_pdf LONGBLOB,
+    poliza_updated_at TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -25,6 +29,10 @@ CREATE TABLE remolques (
     tipo ENUM('caja_seca', 'plataforma', 'tolva', 'tanque', 'refrigerado') DEFAULT 'caja_seca',
     capacidad_toneladas DECIMAL(10, 2) NOT NULL,
     estado ENUM('disponible', 'en_uso', 'mantenimiento', 'fuera_servicio') DEFAULT 'disponible',
+    poliza_nombre VARCHAR(255),
+    poliza_mime VARCHAR(100),
+    poliza_pdf LONGBLOB,
+    poliza_updated_at TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
