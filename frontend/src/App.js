@@ -13,6 +13,7 @@ import Clientes from './pages/Clientes';
 import Refacciones from './pages/Refacciones';
 import Mantenimiento from './pages/Mantenimiento';
 import Reportes from './pages/Reportes';
+import Usuarios from './pages/Usuarios';
 
 // Componente para proteger rutas
 function ProtectedRoute({ children }) {
@@ -62,6 +63,7 @@ function App() {
                 <Route path="/refacciones" element={<Refacciones />} />
                 <Route path="/mantenimiento" element={<Mantenimiento />} />
                 <Route path="/reportes" element={<Reportes />} />
+                <Route path="/usuarios" element={<Usuarios />} />
               </Routes>
             </Layout>
           </ProtectedRoute>

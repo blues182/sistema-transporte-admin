@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { useToast, Toast } from '../components/Toast';
+import { ConfirmModal } from '../components/ConfirmModal';
 
 function ViajeDetalle() {
   const { id } = useParams();
@@ -9,6 +11,14 @@ function ViajeDetalle() {
   const [utilidad, setUtilidad] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showGastoModal, setShowGastoModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [confirmEliminar, setConfirmEliminar] = useState(false);
+  const [trailers, setTrailers] = useState([]);
+  const [conductores, setConductores] = useState([]);
+  const [clientes, setClientes] = useState([]);
+  const [editForm, setEditForm] = useState({});
+  const [editLoading, setEditLoading] = useState(false);
+  const { toasts, removeToast, toast } = useToast();
   const [gastoForm, setGastoForm] = useState({
     tipo_gasto: 'diesel',
     descripcion: '',
@@ -23,7 +33,23 @@ function ViajeDetalle() {
   useEffect(() => {
     cargarViaje();
     cargarUtilidad();
+    cargarCatalogos();
   }, [id]);
+
+  const cargarCatalogos = async () => {
+    try {
+      const [trailersRes, conductoresRes, clientesRes] = await Promise.all([
+        api.get('/trailers'),
+        api.get('/conductores'),
+        api.get('/clientes')
+      ]);
+      setTrailers(trailersRes.data);
+      setConductores(conductoresRes.data);
+      setClientes(clientesRes.data);
+    } catch (error) {
+      console.error('Error al cargar catálogos:', error);
+    }
+  };
 
   const cargarViaje = async () => {
     try {
@@ -46,14 +72,76 @@ function ViajeDetalle() {
   };
 
   const completarViaje = async () => {
-    if (!window.confirm('¿Está seguro de marcar este viaje como completado?')) return;
     try {
       await api.put(`/viajes/${id}`, { estado: 'completado' });
-      alert('Viaje completado exitosamente');
+      toast.success('Viaje marcado como completado');
       cargarViaje();
     } catch (error) {
-      console.error('Error al completar viaje:', error);
-      alert('Error al completar el viaje');
+      toast.error('Error al completar el viaje');
+    }
+  };
+
+  const eliminarViaje = async () => {
+    setConfirmEliminar(false);
+    try {
+      await api.delete(`/viajes/${id}`);
+      navigate('/viajes');
+    } catch (error) {
+      toast.error('Error al eliminar el viaje: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
+  const abrirModalEdicion = () => {
+    setEditForm({
+      folio: viaje.folio || '',
+      numero_orden: viaje.numero_orden || '',
+      fecha_salida: viaje.fecha_salida ? viaje.fecha_salida.slice(0, 16) : '',
+      fecha_llegada: viaje.fecha_llegada ? viaje.fecha_llegada.slice(0, 16) : '',
+      origen: viaje.origen || '',
+      destino: viaje.destino || '',
+      trailer_id: viaje.trailer_id || '',
+      conductor_id: viaje.conductor_id || '',
+      cliente_id: viaje.cliente_id || '',
+      carga_descripcion: viaje.carga_descripcion || '',
+      tipo_carga: viaje.tipo_carga || 'general',
+      peso_carga: viaje.peso_carga || '',
+      monto_cobrado: viaje.monto_cobrado || '',
+      km_inicial: viaje.km_inicial || '',
+      km_final: viaje.km_final || '',
+      estado: viaje.estado || 'programado',
+    });
+    setShowEditModal(true);
+  };
+
+  const handleEditChange = (e) => {
+    const { name, value } = e.target;
+    setEditForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmitEdit = async (e) => {
+    e.preventDefault();
+    setEditLoading(true);
+    try {
+      const dataToSend = { ...editForm };
+      ['trailer_id', 'conductor_id', 'cliente_id'].forEach(k => {
+        if (dataToSend[k]) dataToSend[k] = parseInt(dataToSend[k]);
+      });
+      ['monto_cobrado', 'peso_carga', 'km_inicial', 'km_final'].forEach(k => {
+        if (dataToSend[k]) dataToSend[k] = parseFloat(dataToSend[k]);
+        else delete dataToSend[k];
+      });
+      ['numero_orden', 'fecha_llegada', 'carga_descripcion'].forEach(k => {
+        if (!dataToSend[k]) delete dataToSend[k];
+      });
+      await api.put(`/viajes/${id}`, dataToSend);
+      toast.success('Viaje actualizado correctamente');
+      setShowEditModal(false);
+      cargarViaje();
+      cargarUtilidad();
+    } catch (error) {
+      toast.error('Error al actualizar el viaje: ' + (error.response?.data?.error || error.message));
+    } finally {
+      setEditLoading(false);
     }
   };
 
@@ -96,7 +184,7 @@ function ViajeDetalle() {
       }
 
       await api.post('/gastos', dataToSend);
-      alert('Gasto agregado exitosamente');
+      toast.success('Gasto agregado exitosamente');
       setShowGastoModal(false);
       setGastoForm({
         tipo_gasto: 'diesel',
@@ -111,8 +199,7 @@ function ViajeDetalle() {
       cargarViaje();
       cargarUtilidad();
     } catch (error) {
-      console.error('Error al agregar gasto:', error);
-      alert('Error al agregar el gasto');
+      toast.error('Error al agregar el gasto: ' + (error.response?.data?.error || error.message));
     }
   };
 
@@ -144,6 +231,15 @@ function ViajeDetalle() {
 
   return (
     <div className="space-y-6">
+      <Toast toasts={toasts} removeToast={removeToast} />
+      <ConfirmModal
+        isOpen={confirmEliminar}
+        title="Eliminar viaje"
+        message={`¿Estás seguro de eliminar el viaje ${viaje?.folio}? Esta acción no se puede deshacer.`}
+        confirmText="Sí, eliminar"
+        onConfirm={eliminarViaje}
+        onCancel={() => setConfirmEliminar(false)}
+      />
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-800">Detalles del Viaje</h1>
         <div className="flex space-x-4">
@@ -152,6 +248,12 @@ function ViajeDetalle() {
               ✓ Completar Viaje
             </button>
           )}
+          <button onClick={abrirModalEdicion} className="btn btn-primary">
+            ✎ Editar
+          </button>
+          <button onClick={() => setConfirmEliminar(true)} className="btn btn-danger">
+            🗑 Eliminar
+          </button>
           <button onClick={() => navigate('/viajes')} className="btn btn-secondary">
             ← Volver
           </button>
@@ -450,6 +552,130 @@ function ViajeDetalle() {
                 </button>
                 <button type="submit" className="btn btn-primary">
                   Guardar Gasto
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Editar Viaje */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-3xl w-full p-6 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">Editar Viaje</h2>
+            <form onSubmit={handleSubmitEdit} className="space-y-4">
+
+              {/* Identificación */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="label">Folio</label>
+                  <input type="text" name="folio" value={editForm.folio} onChange={handleEditChange} className="input" required />
+                </div>
+                <div>
+                  <label className="label">Número de Orden</label>
+                  <input type="text" name="numero_orden" value={editForm.numero_orden} onChange={handleEditChange} className="input" placeholder="Opcional" />
+                </div>
+                <div>
+                  <label className="label">Estado</label>
+                  <select name="estado" value={editForm.estado} onChange={handleEditChange} className="input">
+                    <option value="programado">Programado</option>
+                    <option value="en_ruta">En Ruta</option>
+                    <option value="completado">Completado</option>
+                    <option value="cancelado">Cancelado</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Fechas */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Fecha de Salida *</label>
+                  <input type="datetime-local" name="fecha_salida" value={editForm.fecha_salida} onChange={handleEditChange} className="input" required />
+                </div>
+                <div>
+                  <label className="label">Fecha de Llegada</label>
+                  <input type="datetime-local" name="fecha_llegada" value={editForm.fecha_llegada} onChange={handleEditChange} className="input" />
+                </div>
+              </div>
+
+              {/* Ruta */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Origen *</label>
+                  <input type="text" name="origen" value={editForm.origen} onChange={handleEditChange} className="input" required />
+                </div>
+                <div>
+                  <label className="label">Destino *</label>
+                  <input type="text" name="destino" value={editForm.destino} onChange={handleEditChange} className="input" required />
+                </div>
+              </div>
+
+              {/* Asignaciones */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="label">Cliente *</label>
+                  <select name="cliente_id" value={editForm.cliente_id} onChange={handleEditChange} className="input" required>
+                    <option value="">Seleccionar</option>
+                    {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Trailer *</label>
+                  <select name="trailer_id" value={editForm.trailer_id} onChange={handleEditChange} className="input" required>
+                    <option value="">Seleccionar</option>
+                    {trailers.map(t => <option key={t.id} value={t.id}>{t.numero_economico} - {t.placas}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Conductor *</label>
+                  <select name="conductor_id" value={editForm.conductor_id} onChange={handleEditChange} className="input" required>
+                    <option value="">Seleccionar</option>
+                    {conductores.map(c => <option key={c.id} value={c.id}>{c.nombre} {c.apellidos}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Carga y Financiero */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Descripción de Carga</label>
+                  <input type="text" name="carga_descripcion" value={editForm.carga_descripcion} onChange={handleEditChange} className="input" />
+                </div>
+                <div>
+                  <label className="label">Tipo de Carga</label>
+                  <select name="tipo_carga" value={editForm.tipo_carga} onChange={handleEditChange} className="input">
+                    <option value="general">General</option>
+                    <option value="refrigerada">Refrigerada</option>
+                    <option value="peligrosa">Peligrosa</option>
+                    <option value="liquida">Líquida</option>
+                    <option value="granel">Granel</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Peso (kg)</label>
+                  <input type="number" name="peso_carga" value={editForm.peso_carga} onChange={handleEditChange} className="input" step="0.01" />
+                </div>
+                <div>
+                  <label className="label">Monto Cobrado *</label>
+                  <input type="number" name="monto_cobrado" value={editForm.monto_cobrado} onChange={handleEditChange} className="input" step="0.01" required />
+                </div>
+                <div>
+                  <label className="label">KM Inicial</label>
+                  <input type="number" name="km_inicial" value={editForm.km_inicial} onChange={handleEditChange} className="input" step="0.01" />
+                </div>
+                <div>
+                  <label className="label">KM Final</label>
+                  <input type="number" name="km_final" value={editForm.km_final} onChange={handleEditChange} className="input" step="0.01" />
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-4 mt-6">
+                <button type="button" onClick={() => setShowEditModal(false)} className="btn btn-secondary">
+                  Cancelar
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={editLoading}>
+                  {editLoading ? 'Guardando...' : 'Guardar Cambios'}
                 </button>
               </div>
             </form>

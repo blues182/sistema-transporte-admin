@@ -168,6 +168,27 @@ router.post('/:id/completar', async (req, res) => {
   }
 });
 
+// Eliminar viaje
+router.delete('/:id', async (req, res) => {
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    await connection.query('DELETE FROM gastos_viaje WHERE viaje_id = ?', [req.params.id]);
+    const [result] = await connection.query('DELETE FROM viajes WHERE id = ?', [req.params.id]);
+    if (result.affectedRows === 0) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Viaje no encontrado' });
+    }
+    await connection.commit();
+    res.json({ message: 'Viaje eliminado exitosamente' });
+  } catch (error) {
+    await connection.rollback();
+    res.status(500).json({ error: error.message });
+  } finally {
+    connection.release();
+  }
+});
+
 // Calcular utilidad de un viaje
 router.get('/:id/utilidad', async (req, res) => {
   try {

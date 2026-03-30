@@ -24,6 +24,7 @@ function Layout({ children, usuario, onLogout }) {
     { path: '/refacciones', name: 'Inventario', icon: '🔩', roles: ['admin', 'normal'] },
     { path: '/mantenimiento', name: 'Mantenimiento', icon: '🔧', roles: ['admin', 'normal'] },
     { path: '/reportes', name: 'Reportes', icon: '📈', roles: ['admin', 'normal'] },
+    { path: '/usuarios', name: 'Usuarios', icon: '🔑', roles: ['admin'] },
   ];
 
   // Filtrar menú según rol

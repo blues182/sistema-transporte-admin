@@ -21,9 +21,10 @@ const refaccionesRoutes = require('./routes/refacciones');
 const gastosRoutes = require('./routes/gastos');
 const mantenimientoRoutes = require('./routes/mantenimiento');
 const reportesRoutes = require('./routes/reportes');
+const usuariosRoutes = require('./routes/usuarios');
 
 // Middleware de autenticación
-const { verificarToken, verificarPermisoEscritura } = require('./middleware/auth');
+const { verificarToken, verificarAdmin, verificarPermisoEscritura } = require('./middleware/auth');
 
 // Rutas públicas (sin autenticación)
 app.use('/api/auth', authRoutes);
@@ -38,6 +39,7 @@ app.use('/api/refacciones', verificarToken, verificarPermisoEscritura, refaccion
 app.use('/api/gastos', verificarToken, verificarPermisoEscritura, gastosRoutes);
 app.use('/api/mantenimiento', verificarToken, verificarPermisoEscritura, mantenimientoRoutes);
 app.use('/api/reportes', verificarToken, reportesRoutes);
+app.use('/api/usuarios', verificarToken, verificarAdmin, usuariosRoutes);
 
 // Ruta de prueba
 app.get('/', (req, res) => {
