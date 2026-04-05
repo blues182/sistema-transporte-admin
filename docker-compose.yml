@@ -43,7 +43,7 @@ services:
       DB_PORT: 3306
       JWT_SECRET: ${JWT_SECRET:-tu_secreto_super_seguro_cambiar_en_produccion}
     ports:
-      - "5000:5000"
+      - "5001:5000"
     depends_on:
       database:
         condition: service_healthy
