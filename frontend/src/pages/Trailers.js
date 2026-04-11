@@ -1,14 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import api from '../services/api';
+import { useFeedback } from '../components/FeedbackProvider';
 
 function Trailers() {
   const [trailers, setTrailers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [guardando, setGuardando] = useState(false);
   const [subiendoPolizaId, setSubiendoPolizaId] = useState(null);
   const [descargandoPolizaId, setDescargandoPolizaId] = useState(null);
   const [eliminandoPolizaId, setEliminandoPolizaId] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [editando, setEditando] = useState(null);
+  const { showToast, confirmAction } = useFeedback();
   const [formData, setFormData] = useState({
     numero_economico: '',
     placas: '',
@@ -37,12 +40,13 @@ function Trailers() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      setGuardando(true);
       if (editando) {
         await api.put(`/trailers/${editando}`, formData);
-        alert('Trailer actualizado exitosamente');
+        showToast('Trailer actualizado exitosamente', 'success');
       } else {
         await api.post('/trailers', formData);
-        alert('Trailer creado exitosamente');
+        showToast('Trailer creado exitosamente', 'success');
       }
       setShowModal(false);
       setEditando(null);
@@ -50,7 +54,9 @@ function Trailers() {
       resetForm();
     } catch (error) {
       console.error('Error al guardar trailer:', error);
-      alert(error.response?.data?.error || 'Error al guardar el trailer');
+      showToast(error.response?.data?.error || 'Error al guardar el trailer', 'error');
+    } finally {
+      setGuardando(false);
     }
   };
 
@@ -85,7 +91,7 @@ function Trailers() {
     if (!archivo) return;
 
     if (archivo.type !== 'application/pdf' && !archivo.name.toLowerCase().endsWith('.pdf')) {
-      alert('Solo se permiten archivos PDF');
+      showToast('Solo se permiten archivos PDF', 'warning');
       return;
     }
 
@@ -100,11 +106,11 @@ function Trailers() {
         },
       });
 
-      alert('Póliza subida exitosamente');
+      showToast('Póliza subida exitosamente', 'success');
       await cargarTrailers();
     } catch (error) {
       console.error('Error al subir póliza:', error);
-      alert(error.response?.data?.error || 'Error al subir la póliza');
+      showToast(error.response?.data?.error || 'Error al subir la póliza', 'error');
     } finally {
       setSubiendoPolizaId(null);
     }
@@ -136,25 +142,33 @@ function Trailers() {
       window.URL.revokeObjectURL(blobUrl);
     } catch (error) {
       console.error('Error al descargar póliza:', error);
-      alert(error.response?.data?.error || 'Error al descargar la póliza');
+      showToast(error.response?.data?.error || 'Error al descargar la póliza', 'error');
     } finally {
       setDescargandoPolizaId(null);
     }
   };
 
   const eliminarPoliza = async (trailer) => {
-    if (!window.confirm(`¿Eliminar póliza de ${trailer.numero_economico}?`)) {
+    const confirmar = await confirmAction({
+      title: 'Eliminar póliza',
+      message: `Se eliminara la póliza del trailer ${trailer.numero_economico}. Esta acción no se puede deshacer.`,
+      confirmText: 'Si, eliminar',
+      cancelText: 'Cancelar',
+      tone: 'danger'
+    });
+
+    if (!confirmar) {
       return;
     }
 
     try {
       setEliminandoPolizaId(trailer.id);
       await api.delete(`/trailers/${trailer.id}/poliza`);
-      alert('Póliza eliminada exitosamente');
+      showToast('Póliza eliminada exitosamente', 'success');
       await cargarTrailers();
     } catch (error) {
       console.error('Error al eliminar póliza:', error);
-      alert(error.response?.data?.error || 'Error al eliminar la póliza');
+      showToast(error.response?.data?.error || 'Error al eliminar la póliza', 'error');
     } finally {
       setEliminandoPolizaId(null);
     }
@@ -336,12 +350,13 @@ function Trailers() {
                 <button
                   type="button"
                   onClick={() => { setShowModal(false); resetForm(); }}
+                  disabled={guardando}
                   className="btn btn-secondary"
                 >
                   Cancelar
                 </button>
-                <button type="submit" className="btn btn-primary">
-                  {editando ? 'Actualizar Trailer' : 'Crear Trailer'}
+                <button type="submit" disabled={guardando} className="btn btn-primary disabled:opacity-60 disabled:cursor-not-allowed">
+                  {guardando ? 'Guardando...' : (editando ? 'Actualizar Trailer' : 'Crear Trailer')}
                 </button>
               </div>
             </form>

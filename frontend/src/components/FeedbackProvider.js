@@ -25,6 +25,10 @@ function FeedbackProvider({ children }) {
     }, duration);
   }, []);
 
+  const removeToast = useCallback((id) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
+
   const confirmAction = useCallback((options = {}) => {
     return new Promise((resolve) => {
       setConfirmState({
@@ -57,48 +61,86 @@ function FeedbackProvider({ children }) {
   }), [showToast, confirmAction]);
 
   const toastStyles = {
-    success: 'bg-green-600 text-white',
-    error: 'bg-red-600 text-white',
-    warning: 'bg-amber-500 text-white',
-    info: 'bg-slate-700 text-white',
+    success: 'border-emerald-200 bg-emerald-50 text-emerald-900',
+    error: 'border-rose-200 bg-rose-50 text-rose-900',
+    warning: 'border-amber-200 bg-amber-50 text-amber-900',
+    info: 'border-blue-200 bg-blue-50 text-blue-900',
   };
 
-  const confirmButtonClass = confirmState.tone === 'danger'
-    ? 'bg-red-600 hover:bg-red-700'
-    : 'bg-blue-600 hover:bg-blue-700';
+  const toastIcons = {
+    success: '✓',
+    error: 'x',
+    warning: '!',
+    info: 'i',
+  };
+
+  const confirmToneStyles = {
+    danger: {
+      chip: 'bg-rose-100 text-rose-700 border border-rose-200',
+      button: 'bg-rose-600 hover:bg-rose-700',
+      icon: '!',
+    },
+    primary: {
+      chip: 'bg-blue-100 text-blue-700 border border-blue-200',
+      button: 'bg-blue-600 hover:bg-blue-700',
+      icon: 'i',
+    },
+  };
+
+  const activeConfirmTone = confirmToneStyles[confirmState.tone] || confirmToneStyles.danger;
 
   return (
     <FeedbackContext.Provider value={value}>
       {children}
 
-      <div className="fixed top-4 right-4 z-[100] space-y-3 w-[90vw] max-w-sm">
+      <div className="fixed top-4 right-4 z-[100] space-y-3 w-[92vw] max-w-sm">
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`rounded-xl shadow-lg px-4 py-3 text-sm font-medium animate-[fadeIn_200ms_ease-out] ${toastStyles[toast.type] || toastStyles.info}`}
+            className={`border rounded-xl shadow-lg px-3.5 py-3 text-sm animate-toastIn ${toastStyles[toast.type] || toastStyles.info}`}
           >
-            {toast.message}
+            <div className="flex items-start gap-3">
+              <div className="h-6 w-6 shrink-0 rounded-full bg-white/80 border border-black/5 flex items-center justify-center text-xs font-bold mt-0.5">
+                {toastIcons[toast.type] || toastIcons.info}
+              </div>
+              <div className="flex-1 pr-1 leading-5 font-medium">{toast.message}</div>
+              <button
+                type="button"
+                className="opacity-70 hover:opacity-100 text-sm leading-none mt-0.5"
+                onClick={() => removeToast(toast.id)}
+                aria-label="Cerrar notificacion"
+              >
+                x
+              </button>
+            </div>
           </div>
         ))}
       </div>
 
       {confirmState.open && (
-        <div className="fixed inset-0 bg-black/45 z-[110] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
-            <h3 className="text-xl font-bold text-gray-800">{confirmState.title}</h3>
-            <p className="text-gray-600 mt-2">{confirmState.message}</p>
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-[2px] z-[110] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 max-w-md w-full p-6 animate-modalIn">
+            <div className="flex items-start gap-3">
+              <div className={`h-10 w-10 shrink-0 rounded-xl flex items-center justify-center font-bold ${activeConfirmTone.chip}`}>
+                {activeConfirmTone.icon}
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-slate-800 leading-6">{confirmState.title}</h3>
+                <p className="text-slate-600 mt-2 leading-6">{confirmState.message}</p>
+              </div>
+            </div>
 
             <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
-                className="btn btn-secondary"
+                className="btn bg-slate-100 text-slate-700 hover:bg-slate-200"
                 onClick={() => closeConfirm(false)}
               >
                 {confirmState.cancelText}
               </button>
               <button
                 type="button"
-                className={`btn text-white ${confirmButtonClass}`}
+                className={`btn text-white ${activeConfirmTone.button}`}
                 onClick={() => closeConfirm(true)}
               >
                 {confirmState.confirmText}

@@ -14,6 +14,7 @@ import Refacciones from './pages/Refacciones';
 import Mantenimiento from './pages/Mantenimiento';
 import Reportes from './pages/Reportes';
 import Usuarios from './pages/Usuarios';
+import { FeedbackProvider } from './components/FeedbackProvider';
 
 // Componente para proteger rutas
 function ProtectedRoute({ children }) {
@@ -43,33 +44,35 @@ function App() {
   };
 
   return (
-    <Router>
-      <Routes>
-        <Route path="/login" element={<Login onLoginSuccess={handleLoginSuccess} />} />
-        
-        <Route path="/*" element={
-          <ProtectedRoute>
-            <Layout usuario={usuario} onLogout={handleLogout}>
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/viajes" element={<Viajes />} />
-                <Route path="/viajes/:id" element={<ViajeDetalle />} />
-                <Route path="/viajes/nuevo" element={<NuevoViaje />} />
-                <Route path="/trailers" element={<Trailers />} />
-                <Route path="/remolques" element={<Remolques />} />
-                <Route path="/conductores" element={<Conductores />} />
-                <Route path="/clientes" element={<Clientes />} />
-                <Route path="/refacciones" element={<Refacciones />} />
-                <Route path="/mantenimiento" element={<Mantenimiento />} />
-                <Route path="/reportes" element={<Reportes />} />
-                <Route path="/usuarios" element={<Usuarios />} />
-              </Routes>
-            </Layout>
-          </ProtectedRoute>
-        } />
-      </Routes>
-    </Router>
+    <FeedbackProvider>
+      <Router>
+        <Routes>
+          <Route path="/login" element={<Login onLoginSuccess={handleLoginSuccess} />} />
+          
+          <Route path="/*" element={
+            <ProtectedRoute>
+              <Layout usuario={usuario} onLogout={handleLogout}>
+                <Routes>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/viajes" element={<Viajes />} />
+                  <Route path="/viajes/:id" element={<ViajeDetalle />} />
+                  <Route path="/viajes/nuevo" element={<NuevoViaje />} />
+                  <Route path="/trailers" element={<Trailers />} />
+                  <Route path="/remolques" element={<Remolques />} />
+                  <Route path="/conductores" element={<Conductores />} />
+                  <Route path="/clientes" element={<Clientes />} />
+                  <Route path="/refacciones" element={<Refacciones />} />
+                  <Route path="/mantenimiento" element={<Mantenimiento />} />
+                  <Route path="/reportes" element={<Reportes />} />
+                  <Route path="/usuarios" element={<Usuarios />} />
+                </Routes>
+              </Layout>
+            </ProtectedRoute>
+          } />
+        </Routes>
+      </Router>
+    </FeedbackProvider>
   );
 }
 

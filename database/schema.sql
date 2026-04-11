@@ -136,7 +136,9 @@ CREATE TABLE refacciones (
 -- Tabla de Mantenimiento
 CREATE TABLE mantenimiento (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    trailer_id INT NOT NULL,
+    unidad_tipo ENUM('trailer', 'remolque') DEFAULT 'trailer',
+    trailer_id INT,
+    remolque_id INT,
     fecha DATE NOT NULL,
     tipo ENUM('preventivo', 'correctivo', 'emergencia') NOT NULL,
     descripcion TEXT NOT NULL,
@@ -147,7 +149,8 @@ CREATE TABLE mantenimiento (
     notas TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (trailer_id) REFERENCES trailers(id)
+    FOREIGN KEY (trailer_id) REFERENCES trailers(id),
+    FOREIGN KEY (remolque_id) REFERENCES remolques(id)
 );
 
 -- Tabla de Refacciones usadas en Mantenimiento
@@ -206,5 +209,7 @@ CREATE INDEX idx_viajes_fecha ON viajes(fecha_salida);
 CREATE INDEX idx_viajes_estado ON viajes(estado);
 CREATE INDEX idx_gastos_viaje ON gastos_viaje(viaje_id);
 CREATE INDEX idx_mantenimiento_trailer ON mantenimiento(trailer_id);
+CREATE INDEX idx_mantenimiento_remolque ON mantenimiento(remolque_id);
+CREATE INDEX idx_mantenimiento_unidad_tipo ON mantenimiento(unidad_tipo);
 CREATE INDEX idx_refacciones_stock ON refacciones(stock_actual);
 CREATE INDEX idx_usuarios_username ON usuarios(username);

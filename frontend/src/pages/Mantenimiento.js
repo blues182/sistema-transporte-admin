@@ -1,15 +1,22 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import api from '../services/api';
+import { useFeedback } from '../components/FeedbackProvider';
 
 function Mantenimiento() {
   const [mantenimientos, setMantenimientos] = useState([]);
   const [trailers, setTrailers] = useState([]);
+  const [remolques, setRemolques] = useState([]);
   const [refacciones, setRefacciones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [filtroTrailer, setFiltroTrailer] = useState('');
+  const [guardando, setGuardando] = useState(false);
+  const [completandoId, setCompletandoId] = useState(null);
+  const [filtroTipoUnidad, setFiltroTipoUnidad] = useState('');
+  const [filtroUnidad, setFiltroUnidad] = useState('');
+  const { showToast, confirmAction } = useFeedback();
   const [formData, setFormData] = useState({
-    trailer_id: '',
+    unidad_tipo: 'trailer',
+    unidad_id: '',
     fecha: new Date().toISOString().split('T')[0],
     tipo: 'preventivo',
     descripcion: '',
@@ -24,25 +31,53 @@ function Mantenimiento() {
   }, []);
 
   const cargarDatos = async () => {
-    try {
-      const [mantRes, trailersRes, refacRes] = await Promise.all([
-        api.get('/mantenimiento'),
-        api.get('/trailers'),
-        api.get('/refacciones')
-      ]);
-      setMantenimientos(mantRes.data);
-      setTrailers(trailersRes.data);
-      setRefacciones(refacRes.data);
-      setLoading(false);
-    } catch (error) {
-      console.error('Error al cargar datos:', error);
-      setLoading(false);
+    const [mantRes, trailersRes, remolquesRes, refacRes] = await Promise.allSettled([
+      api.get('/mantenimiento'),
+      api.get('/trailers'),
+      api.get('/remolques'),
+      api.get('/refacciones')
+    ]);
+
+    if (mantRes.status === 'fulfilled') {
+      setMantenimientos(mantRes.value.data);
+    } else {
+      console.error('Error al cargar mantenimientos:', mantRes.reason);
+      setMantenimientos([]);
     }
+
+    if (trailersRes.status === 'fulfilled') {
+      setTrailers(trailersRes.value.data);
+    } else {
+      console.error('Error al cargar trailers:', trailersRes.reason);
+      setTrailers([]);
+    }
+
+    if (remolquesRes.status === 'fulfilled') {
+      setRemolques(remolquesRes.value.data);
+    } else {
+      console.error('Error al cargar remolques:', remolquesRes.reason);
+      setRemolques([]);
+    }
+
+    if (refacRes.status === 'fulfilled') {
+      setRefacciones(refacRes.value.data);
+    } else {
+      console.error('Error al cargar refacciones:', refacRes.reason);
+      setRefacciones([]);
+    }
+
+    setLoading(false);
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => {
+      const updated = { ...prev, [name]: value };
+      if (name === 'unidad_tipo') {
+        updated.unidad_id = '';
+      }
+      return updated;
+    });
   };
 
   const agregarRefaccion = () => {
@@ -76,17 +111,33 @@ function Mantenimiento() {
     });
   };
 
-  // Filtrar mantenimientos por trailer
+  // Filtrar mantenimientos por unidad (trailer/remolque)
   const mantenimientosFiltrados = useMemo(() => {
-    if (!filtroTrailer) return mantenimientos;
-    return mantenimientos.filter(m => m.trailer_id === parseInt(filtroTrailer));
-  }, [mantenimientos, filtroTrailer]);
+    return mantenimientos.filter(m => {
+      const mantenimientoTipo = m.unidad_tipo || 'trailer';
+      const mantenimientoUnidadId = m.unidad_id || m.remolque_id || m.trailer_id;
+
+      if (filtroTipoUnidad && mantenimientoTipo !== filtroTipoUnidad) {
+        return false;
+      }
+
+      if (!filtroUnidad) {
+        return true;
+      }
+
+      const [tipo, id] = filtroUnidad.split(':');
+      const unidadId = parseInt(id, 10);
+      return mantenimientoTipo === tipo && mantenimientoUnidadId === unidadId;
+    });
+  }, [mantenimientos, filtroTipoUnidad, filtroUnidad]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      setGuardando(true);
       const dataToSend = {
-        trailer_id: parseInt(formData.trailer_id),
+        unidad_tipo: formData.unidad_tipo,
+        unidad_id: parseInt(formData.unidad_id, 10),
         fecha: formData.fecha,
         tipo: formData.tipo,
         descripcion: formData.descripcion,
@@ -102,10 +153,11 @@ function Mantenimiento() {
       if (formData.taller) dataToSend.taller = formData.taller;
 
       await api.post('/mantenimiento', dataToSend);
-      alert('Mantenimiento registrado exitosamente');
+      showToast('Mantenimiento registrado exitosamente', 'success');
       setShowModal(false);
       setFormData({
-        trailer_id: '',
+        unidad_tipo: 'trailer',
+        unidad_id: '',
         fecha: new Date().toISOString().split('T')[0],
         tipo: 'preventivo',
         descripcion: '',
@@ -117,7 +169,9 @@ function Mantenimiento() {
       cargarDatos();
     } catch (error) {
       console.error('Error al registrar mantenimiento:', error);
-      alert('Error: ' + (error.response?.data?.error || error.message));
+      showToast(error.response?.data?.error || error.message, 'error');
+    } finally {
+      setGuardando(false);
     }
   };
 
@@ -147,14 +201,26 @@ function Mantenimiento() {
   };
 
   const completarMantenimiento = async (id) => {
-    if (!window.confirm('¿Está seguro de marcar este mantenimiento como completado?')) return;
+    const confirmar = await confirmAction({
+      title: 'Completar mantenimiento',
+      message: 'Se marcara este mantenimiento como completado y la unidad cambiara a disponible/activa.',
+      confirmText: 'Si, completar',
+      cancelText: 'Cancelar',
+      tone: 'primary'
+    });
+
+    if (!confirmar) return;
+
     try {
+      setCompletandoId(id);
       await api.put(`/mantenimiento/${id}`, { estado: 'completado' });
-      alert('Mantenimiento completado exitosamente');
+      showToast('Mantenimiento completado exitosamente', 'success');
       cargarDatos();
     } catch (error) {
       console.error('Error al completar mantenimiento:', error);
-      alert('Error al completar el mantenimiento');
+      showToast(error.response?.data?.error || 'Error al completar el mantenimiento', 'error');
+    } finally {
+      setCompletandoId(null);
     }
   };
 
@@ -175,16 +241,36 @@ function Mantenimiento() {
       <div className="card">
         <div className="flex gap-4 items-end">
           <div>
-            <label className="label">Filtrar por Carro/Remolque</label>
+            <label className="label">Filtrar por Tipo de Unidad</label>
             <select
-              value={filtroTrailer}
-              onChange={(e) => setFiltroTrailer(e.target.value)}
+              value={filtroTipoUnidad}
+              onChange={(e) => {
+                setFiltroTipoUnidad(e.target.value);
+                setFiltroUnidad('');
+              }}
               className="input w-64"
             >
-              <option value="">Todos los Trailers</option>
-              {trailers.map((trailer) => (
-                <option key={trailer.id} value={trailer.id}>
-                  {trailer.numero_economico} - {trailer.placas}
+              <option value="">Todos</option>
+              <option value="trailer">Solo Carro/Trailer</option>
+              <option value="remolque">Solo Remolque</option>
+            </select>
+          </div>
+          <div>
+            <label className="label">Filtrar por Carro/Remolque</label>
+            <select
+              value={filtroUnidad}
+              onChange={(e) => setFiltroUnidad(e.target.value)}
+              className="input w-64"
+            >
+              <option value="">Todas las Unidades</option>
+              {(filtroTipoUnidad === '' || filtroTipoUnidad === 'trailer') && trailers.map((trailer) => (
+                <option key={`trailer-${trailer.id}`} value={`trailer:${trailer.id}`}>
+                  Trailer: {trailer.numero_economico} - {trailer.placas}
+                </option>
+              ))}
+              {(filtroTipoUnidad === '' || filtroTipoUnidad === 'remolque') && remolques.map((remolque) => (
+                <option key={`remolque-${remolque.id}`} value={`remolque:${remolque.id}`}>
+                  Remolque: {remolque.numero_remolque}
                 </option>
               ))}
             </select>
@@ -202,7 +288,7 @@ function Mantenimiento() {
             <thead>
               <tr>
                 <th>Fecha</th>
-                <th>Trailer</th>
+                <th>Unidad</th>
                 <th>Tipo</th>
                 <th>Descripción</th>
                 <th>Costo</th>
@@ -215,7 +301,10 @@ function Mantenimiento() {
               {mantenimientosFiltrados.map((mant) => (
                 <tr key={mant.id} className="hover:bg-gray-50">
                   <td>{new Date(mant.fecha).toLocaleDateString('es-MX')}</td>
-                  <td className="font-medium">{mant.numero_economico}</td>
+                  <td className="font-medium">
+                    {mant.unidad_tipo === 'remolque' ? 'Remolque' : 'Trailer'}: {mant.numero_economico}
+                    {mant.placas ? ` - ${mant.placas}` : ''}
+                  </td>
                   <td>
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${getTipoBadge(mant.tipo)}`}>
                       {mant.tipo.toUpperCase()}
@@ -235,9 +324,10 @@ function Mantenimiento() {
                     {mant.estado !== 'completado' && (
                       <button
                         onClick={() => completarMantenimiento(mant.id)}
-                        className="text-green-600 hover:text-green-800 font-medium text-sm"
+                        disabled={completandoId === mant.id}
+                        className="text-green-600 hover:text-green-800 font-medium text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                       >
-                        ✓ Completar
+                        {completandoId === mant.id ? 'Completando...' : '✓ Completar'}
                       </button>
                     )}
                   </td>
@@ -247,7 +337,7 @@ function Mantenimiento() {
           </table>
           {mantenimientosFiltrados.length === 0 && (
             <div className="text-center py-8 text-gray-500">
-              {filtroTrailer ? 'No hay mantenimientos para este trailer' : 'No hay mantenimientos registrados'}
+              {filtroUnidad ? 'No hay mantenimientos para esta unidad' : 'No hay mantenimientos registrados'}
             </div>
           )}
         </div>
@@ -261,18 +351,36 @@ function Mantenimiento() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="label">Trailer *</label>
+                  <label className="label">Tipo de Unidad *</label>
                   <select
-                    name="trailer_id"
-                    value={formData.trailer_id}
+                    name="unidad_tipo"
+                    value={formData.unidad_tipo}
                     onChange={handleChange}
                     className="input"
                     required
                   >
-                    <option value="">Seleccionar trailer</option>
-                    {trailers.map(trailer => (
-                      <option key={trailer.id} value={trailer.id}>
+                    <option value="trailer">Trailer</option>
+                    <option value="remolque">Remolque</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Unidad *</label>
+                  <select
+                    name="unidad_id"
+                    value={formData.unidad_id}
+                    onChange={handleChange}
+                    className="input"
+                    required
+                  >
+                    <option value="">Seleccionar unidad</option>
+                    {formData.unidad_tipo === 'trailer' && trailers.map(trailer => (
+                      <option key={`form-trailer-${trailer.id}`} value={trailer.id}>
                         {trailer.numero_economico} - {trailer.placas}
+                      </option>
+                    ))}
+                    {formData.unidad_tipo === 'remolque' && remolques.map(remolque => (
+                      <option key={`form-remolque-${remolque.id}`} value={remolque.id}>
+                        {remolque.numero_remolque}
                       </option>
                     ))}
                   </select>
@@ -419,12 +527,13 @@ function Mantenimiento() {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
+                  disabled={guardando}
                   className="btn btn-secondary"
                 >
                   Cancelar
                 </button>
-                <button type="submit" className="btn btn-primary">
-                  Guardar Mantenimiento
+                <button type="submit" disabled={guardando} className="btn btn-primary disabled:opacity-60 disabled:cursor-not-allowed">
+                  {guardando ? 'Guardando...' : 'Guardar Mantenimiento'}
                 </button>
               </div>
             </form>

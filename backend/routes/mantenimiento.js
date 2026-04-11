@@ -2,15 +2,57 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
 
+const ESTADO_ACTIVO_POR_TIPO = {
+  trailer: 'activo',
+  remolque: 'disponible'
+};
+
+const TABLA_POR_TIPO = {
+  trailer: 'trailers',
+  remolque: 'remolques'
+};
+
+const CAMPOS_UNIDAD = {
+  trailer: 'trailer_id',
+  remolque: 'remolque_id'
+};
+
+const parseUnidadPayload = (payload) => {
+  const unidad_tipo = payload.unidad_tipo || (payload.remolque_id ? 'remolque' : 'trailer');
+  const rawUnidadId = payload.unidad_id || payload[CAMPOS_UNIDAD[unidad_tipo]];
+  const unidad_id = parseInt(rawUnidadId, 10);
+  return { unidad_tipo, unidad_id };
+};
+
+const soportaMantenimientoMultiUnidad = async (connection) => {
+  const [unidadTipoCols] = await connection.query("SHOW COLUMNS FROM mantenimiento LIKE 'unidad_tipo'");
+  const [remolqueCols] = await connection.query("SHOW COLUMNS FROM mantenimiento LIKE 'remolque_id'");
+  return unidadTipoCols.length > 0 && remolqueCols.length > 0;
+};
+
 // Obtener todos los mantenimientos
 router.get('/', async (req, res) => {
   try {
-    const [mantenimientos] = await db.query(
-      `SELECT m.*, t.numero_economico, t.placas
-       FROM mantenimiento m
-       JOIN trailers t ON m.trailer_id = t.id
-       ORDER BY m.fecha DESC`
-    );
+    const multiUnidad = await soportaMantenimientoMultiUnidad(db);
+    const [mantenimientos] = multiUnidad
+      ? await db.query(
+          `SELECT m.*,
+                  COALESCE(m.unidad_tipo, 'trailer') AS unidad_tipo,
+                  COALESCE(m.trailer_id, m.remolque_id) AS unidad_id,
+                  COALESCE(t.numero_economico, r.numero_remolque) AS numero_economico,
+                  t.placas,
+                  r.numero_remolque
+           FROM mantenimiento m
+           LEFT JOIN trailers t ON m.trailer_id = t.id
+           LEFT JOIN remolques r ON m.remolque_id = r.id
+           ORDER BY m.fecha DESC`
+        )
+      : await db.query(
+          `SELECT m.*, 'trailer' AS unidad_tipo, m.trailer_id AS unidad_id, t.numero_economico, t.placas
+           FROM mantenimiento m
+           JOIN trailers t ON m.trailer_id = t.id
+           ORDER BY m.fecha DESC`
+        );
     res.json(mantenimientos);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -20,13 +62,28 @@ router.get('/', async (req, res) => {
 // Obtener mantenimiento por ID
 router.get('/:id', async (req, res) => {
   try {
-    const [mantenimientos] = await db.query(
-      `SELECT m.*, t.numero_economico, t.placas
-       FROM mantenimiento m
-       JOIN trailers t ON m.trailer_id = t.id
-       WHERE m.id = ?`,
-      [req.params.id]
-    );
+    const multiUnidad = await soportaMantenimientoMultiUnidad(db);
+    const [mantenimientos] = multiUnidad
+      ? await db.query(
+          `SELECT m.*,
+                  COALESCE(m.unidad_tipo, 'trailer') AS unidad_tipo,
+                  COALESCE(m.trailer_id, m.remolque_id) AS unidad_id,
+                  COALESCE(t.numero_economico, r.numero_remolque) AS numero_economico,
+                  t.placas,
+                  r.numero_remolque
+           FROM mantenimiento m
+           LEFT JOIN trailers t ON m.trailer_id = t.id
+           LEFT JOIN remolques r ON m.remolque_id = r.id
+           WHERE m.id = ?`,
+          [req.params.id]
+        )
+      : await db.query(
+          `SELECT m.*, 'trailer' AS unidad_tipo, m.trailer_id AS unidad_id, t.numero_economico, t.placas
+           FROM mantenimiento m
+           JOIN trailers t ON m.trailer_id = t.id
+           WHERE m.id = ?`,
+          [req.params.id]
+        );
 
     if (mantenimientos.length === 0) {
       return res.status(404).json({ error: 'Mantenimiento no encontrado' });
@@ -51,18 +108,51 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   const connection = await db.getConnection();
   try {
-    const { trailer_id, fecha, tipo, descripcion, kilometraje, costo_mano_obra, taller, refacciones } = req.body;
+    const { fecha, tipo, descripcion, kilometraje, costo_mano_obra, taller, refacciones } = req.body;
+    const { unidad_tipo, unidad_id } = parseUnidadPayload(req.body);
+    const multiUnidad = await soportaMantenimientoMultiUnidad(connection);
+
+    if (!TABLA_POR_TIPO[unidad_tipo]) {
+      return res.status(400).json({ error: 'Tipo de unidad inválido' });
+    }
+
+    if (!multiUnidad && unidad_tipo === 'remolque') {
+      return res.status(400).json({ error: 'Tu base de datos aun no soporta remolques en mantenimiento. Ejecuta la migracion add_mantenimiento_remolques.sql' });
+    }
+
+    if (!Number.isInteger(unidad_id) || unidad_id <= 0) {
+      return res.status(400).json({ error: 'ID de unidad inválido' });
+    }
 
     await connection.beginTransaction();
 
-    // Cambiar el estado del trailer a mantenimiento
-    await connection.query('UPDATE trailers SET estado = ? WHERE id = ?', ['mantenimiento', trailer_id]);
-
-    const [result] = await connection.query(
-      `INSERT INTO mantenimiento (trailer_id, fecha, tipo, descripcion, kilometraje, costo_mano_obra, taller)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [trailer_id, fecha, tipo, descripcion, kilometraje, costo_mano_obra, taller]
+    // Cambiar el estado de la unidad a mantenimiento
+    await connection.query(
+      `UPDATE ${TABLA_POR_TIPO[unidad_tipo]} SET estado = ? WHERE id = ?`,
+      ['mantenimiento', unidad_id]
     );
+
+    const [result] = multiUnidad
+      ? await connection.query(
+          `INSERT INTO mantenimiento (unidad_tipo, trailer_id, remolque_id, fecha, tipo, descripcion, kilometraje, costo_mano_obra, taller)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            unidad_tipo,
+            unidad_tipo === 'trailer' ? unidad_id : null,
+            unidad_tipo === 'remolque' ? unidad_id : null,
+            fecha,
+            tipo,
+            descripcion,
+            kilometraje,
+            costo_mano_obra,
+            taller
+          ]
+        )
+      : await connection.query(
+          `INSERT INTO mantenimiento (trailer_id, fecha, tipo, descripcion, kilometraje, costo_mano_obra, taller)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [unidad_id, fecha, tipo, descripcion, kilometraje, costo_mano_obra, taller]
+        );
 
     const mantenimientoId = result.insertId;
 
@@ -109,14 +199,39 @@ router.put('/:id', async (req, res) => {
     
     const { id } = req.params;
     const updates = req.body;
+    const multiUnidad = await soportaMantenimientoMultiUnidad(connection);
     
-    // Si se está completando el mantenimiento, cambiar el estado del trailer a activo
+    // Si se está completando el mantenimiento, devolver la unidad a su estado activo
     if (updates.estado === 'completado') {
-      // Obtener el trailer_id del mantenimiento
-      const [mant] = await connection.query('SELECT trailer_id FROM mantenimiento WHERE id = ?', [id]);
+      const [mant] = multiUnidad
+        ? await connection.query(
+            `SELECT COALESCE(unidad_tipo, 'trailer') AS unidad_tipo, trailer_id, remolque_id
+             FROM mantenimiento
+             WHERE id = ?`,
+            [id]
+          )
+        : await connection.query(
+            `SELECT 'trailer' AS unidad_tipo, trailer_id, NULL AS remolque_id
+             FROM mantenimiento
+             WHERE id = ?`,
+            [id]
+          );
       if (mant.length > 0) {
-        await connection.query('UPDATE trailers SET estado = ? WHERE id = ?', ['activo', mant[0].trailer_id]);
+        const unidad_tipo = mant[0].unidad_tipo;
+        const unidad_id = unidad_tipo === 'remolque' ? mant[0].remolque_id : mant[0].trailer_id;
+        if (TABLA_POR_TIPO[unidad_tipo] && unidad_id) {
+          await connection.query(
+            `UPDATE ${TABLA_POR_TIPO[unidad_tipo]} SET estado = ? WHERE id = ?`,
+            [ESTADO_ACTIVO_POR_TIPO[unidad_tipo], unidad_id]
+          );
+        }
       }
+    }
+
+    delete updates.unidad_id;
+    if (!multiUnidad) {
+      delete updates.unidad_tipo;
+      delete updates.remolque_id;
     }
     
     const fields = Object.keys(updates).map(key => `${key} = ?`).join(', ');
