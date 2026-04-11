@@ -5,7 +5,7 @@ const db = require('../config/database');
 // Obtener todos los viajes
 router.get('/', async (req, res) => {
   try {
-    const { estado, fecha_inicio, fecha_fin } = req.query;
+    const { estado, fecha_inicio, fecha_fin, numero_orden } = req.query;
     let query = `
       SELECT v.*, 
              t.numero_economico, t.placas,
@@ -28,6 +28,10 @@ router.get('/', async (req, res) => {
     if (estado) {
       query += ' AND v.estado = ?';
       params.push(estado);
+    }
+    if (numero_orden) {
+      query += ' AND v.numero_orden LIKE ?';
+      params.push(`%${numero_orden}%`);
     }
     if (fecha_inicio) {
       query += ' AND v.fecha_salida >= ?';

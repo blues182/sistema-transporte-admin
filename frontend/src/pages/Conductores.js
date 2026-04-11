@@ -1,10 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import api from '../services/api';
+import { useToast, Toast } from '../components/Toast';
+import { ConfirmModal } from '../components/ConfirmModal';
 
 function Conductores() {
   const [conductores, setConductores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [confirm, setConfirm] = useState({ open: false, id: null, nombre: '' });
+  const { toasts, removeToast, toast } = useToast();
   const [formData, setFormData] = useState({
     nombre: '',
     apellidos: '',
@@ -71,6 +75,22 @@ function Conductores() {
     return edad;
   };
 
+  const pedirEliminar = (id, nombre, apellidos) => {
+    setConfirm({ open: true, id, nombre: `${nombre} ${apellidos}` });
+  };
+
+  const confirmarEliminar = async () => {
+    const { id } = confirm;
+    setConfirm({ open: false, id: null, nombre: '' });
+    try {
+      await api.delete(`/conductores/${id}`);
+      setConductores(prev => prev.filter(c => c.id !== id));
+      toast.success('Conductor eliminado correctamente');
+    } catch (error) {
+      toast.error('Error al eliminar el conductor: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
   const getEstadoBadge = (estado) => {
     return estado === 'activo' 
       ? 'bg-green-100 text-green-800' 
@@ -83,6 +103,15 @@ function Conductores() {
 
   return (
     <div className="space-y-6">
+      <Toast toasts={toasts} removeToast={removeToast} />
+      <ConfirmModal
+        isOpen={confirm.open}
+        title="Eliminar conductor"
+        message={`¿Estás seguro de eliminar a ${confirm.nombre}? Esta acción no se puede deshacer.`}
+        confirmText="Sí, eliminar"
+        onConfirm={confirmarEliminar}
+        onCancel={() => setConfirm({ open: false, id: null, nombre: '' })}
+      />
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-800">Conductores</h1>
         <button onClick={() => setShowModal(true)} className="btn btn-primary">
@@ -123,6 +152,7 @@ function Conductores() {
                 <th>Licencia Federal</th>
                 <th>Teléfono</th>
                 <th>Estado</th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -150,6 +180,14 @@ function Conductores() {
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${getEstadoBadge(conductor.estado)}`}>
                       {conductor.estado.toUpperCase()}
                     </span>
+                  </td>
+                  <td>
+                    <button
+                      onClick={() => pedirEliminar(conductor.id, conductor.nombre, conductor.apellidos)}
+                      className="text-red-600 hover:text-red-800 font-medium text-sm"
+                    >
+                      🗑 Eliminar
+                    </button>
                   </td>
                 </tr>
               ))}

@@ -9,6 +9,7 @@ const POR_PAGINA = 15;
 function Viajes() {
   const [viajes, setViajes] = useState([]);
   const [filtroEstado, setFiltroEstado] = useState('');
+  const [filtroNumeroOrden, setFiltroNumeroOrden] = useState('');
   const [busqueda, setBusqueda] = useState('');
   const [pagina, setPagina] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -17,14 +18,16 @@ function Viajes() {
 
   useEffect(() => {
     cargarViajes();
-  }, [filtroEstado]);
+  }, [filtroEstado, filtroNumeroOrden]);
 
   // Resetear página al cambiar búsqueda
-  useEffect(() => { setPagina(1); }, [busqueda, filtroEstado]);
+  useEffect(() => { setPagina(1); }, [busqueda, filtroEstado, filtroNumeroOrden]);
 
   const cargarViajes = async () => {
     try {
-      const params = filtroEstado ? { estado: filtroEstado } : {};
+      const params = {};
+      if (filtroEstado) params.estado = filtroEstado;
+      if (filtroNumeroOrden) params.numero_orden = filtroNumeroOrden;
       const response = await api.get('/viajes', { params });
       setViajes(response.data);
     } catch (error) {
@@ -117,6 +120,16 @@ function Viajes() {
               <option value="completado">Completado</option>
               <option value="cancelado">Cancelado</option>
             </select>
+          </div>
+          <div>
+            <label className="label">Filtrar por Número de Orden</label>
+            <input
+              type="text"
+              value={filtroNumeroOrden}
+              onChange={(e) => setFiltroNumeroOrden(e.target.value)}
+              placeholder="Ej: ORD-2025-001"
+              className="input w-48"
+            />
           </div>
           <div className="flex-1 min-w-[220px]">
             <label className="label">Buscar</label>

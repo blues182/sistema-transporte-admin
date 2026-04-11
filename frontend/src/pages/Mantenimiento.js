@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import api from '../services/api';
 
 function Mantenimiento() {
@@ -7,6 +7,7 @@ function Mantenimiento() {
   const [refacciones, setRefacciones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [filtroTrailer, setFiltroTrailer] = useState('');
   const [formData, setFormData] = useState({
     trailer_id: '',
     fecha: new Date().toISOString().split('T')[0],
@@ -74,6 +75,12 @@ function Mantenimiento() {
       return { ...prev, refacciones: newRefacciones };
     });
   };
+
+  // Filtrar mantenimientos por trailer
+  const mantenimientosFiltrados = useMemo(() => {
+    if (!filtroTrailer) return mantenimientos;
+    return mantenimientos.filter(m => m.trailer_id === parseInt(filtroTrailer));
+  }, [mantenimientos, filtroTrailer]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -164,6 +171,30 @@ function Mantenimiento() {
         </button>
       </div>
 
+      {/* Filtro por Trailer */}
+      <div className="card">
+        <div className="flex gap-4 items-end">
+          <div>
+            <label className="label">Filtrar por Carro/Remolque</label>
+            <select
+              value={filtroTrailer}
+              onChange={(e) => setFiltroTrailer(e.target.value)}
+              className="input w-64"
+            >
+              <option value="">Todos los Trailers</option>
+              {trailers.map((trailer) => (
+                <option key={trailer.id} value={trailer.id}>
+                  {trailer.numero_economico} - {trailer.placas}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="text-sm text-gray-500">
+            {mantenimientosFiltrados.length} registro{mantenimientosFiltrados.length !== 1 ? 's' : ''}
+          </div>
+        </div>
+      </div>
+
       {/* Lista de mantenimientos */}
       <div className="card">
         <div className="overflow-x-auto">
@@ -181,7 +212,7 @@ function Mantenimiento() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {mantenimientos.map((mant) => (
+              {mantenimientosFiltrados.map((mant) => (
                 <tr key={mant.id} className="hover:bg-gray-50">
                   <td>{new Date(mant.fecha).toLocaleDateString('es-MX')}</td>
                   <td className="font-medium">{mant.numero_economico}</td>
@@ -214,9 +245,9 @@ function Mantenimiento() {
               ))}
             </tbody>
           </table>
-          {mantenimientos.length === 0 && (
+          {mantenimientosFiltrados.length === 0 && (
             <div className="text-center py-8 text-gray-500">
-              No hay mantenimientos registrados
+              {filtroTrailer ? 'No hay mantenimientos para este trailer' : 'No hay mantenimientos registrados'}
             </div>
           )}
         </div>
